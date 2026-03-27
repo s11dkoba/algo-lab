@@ -8,46 +8,26 @@ import base64
 import random
 import logging
 import sys
-import configparser
-from pathlib import Path
 from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-CONFIG_PATH = Path(__file__).with_name("config_temp.ini")
+import configparser
+import os
 
+# === API Keys (Set your keys via config_temp.ini or env vars) ===
+config_file_path = os.path.join(os.path.dirname(__file__), 'config_temp.ini')
+config = configparser.ConfigParser()
+if os.path.exists(config_file_path):
+    config.read(config_file_path)
 
-def load_api_config(config_path=CONFIG_PATH):
-    config = configparser.ConfigParser()
-    if not config.read(config_path):
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-
-    try:
-        bitget_api_key = config["bitget"]["api_key"]
-        bitget_api_secret = config["bitget"]["api_secret"]
-        bitget_api_passphrase = config["bitget"]["api_passphrase"]
-        mexc_api_key = config["mexc"]["api_key"]
-        mexc_api_secret = config["mexc"]["api_secret"]
-    except KeyError as exc:
-        raise KeyError(f"Missing config value: {exc}") from exc
-
-    return {
-        "bitget_api_key": bitget_api_key,
-        "bitget_api_secret": bitget_api_secret,
-        "bitget_api_passphrase": bitget_api_passphrase,
-        "mexc_api_key": mexc_api_key,
-        "mexc_api_secret": mexc_api_secret,
-    }
-
-
-API_CONFIG = load_api_config()
-BITGET_API_KEY = API_CONFIG["bitget_api_key"]
-BITGET_API_SECRET = API_CONFIG["bitget_api_secret"]
-BITGET_API_PASSPHRASE = API_CONFIG["bitget_api_passphrase"]
-MEXC_API_KEY = API_CONFIG["mexc_api_key"]
-MEXC_API_SECRET = API_CONFIG["mexc_api_secret"]
+BITGET_API_KEY = os.getenv('BITGET_API_KEY', config.get('bitget', 'api_key', fallback=''))
+BITGET_API_SECRET = os.getenv('BITGET_API_SECRET', config.get('bitget', 'api_secret', fallback=''))
+BITGET_API_PASSPHRASE = os.getenv('BITGET_API_PASSPHRASE', config.get('bitget', 'api_passphrase', fallback=''))
+MEXC_API_KEY = os.getenv('MEXC_API_KEY', config.get('mexc', 'api_key', fallback=''))
+MEXC_API_SECRET = os.getenv('MEXC_API_SECRET', config.get('mexc', 'api_secret', fallback=''))
 
 DRY_RUN = False  # Set to False for live trading
 
@@ -356,6 +336,15 @@ class TradingBot:
     def place_initial_order(self, exchange, asks):
         price = asks[1]['price']
         quantity = asks[0]['quantity'] + 0.01
+
+        # Ensure each order is at least $1 USD equivalent
+        usd_value = price * quantity
+        if usd_value < 1.0:
+            min_qty = 1.0 / price
+            quantity = round(max(min_qty, quantity), 6)
+            # align to assumed lot size 0.01 quantity step
+            quantity = round(quantity / 0.01) * 0.01
+
         order_id = exchange.place_order(self.symbol, 'buy', price, quantity)
         if order_id:
             self.current_orders.append(OrderState(order_id, price, quantity, 'buy', exchange))
@@ -366,6 +355,14 @@ class TradingBot:
         postonly_price = round(avg_price + 0.001, 3)  # Ceil to 3rd decimal
         usd_equivalent_qty = 1 / postonly_price
         quantity = usd_equivalent_qty + 0.01
+
+        # Ensure each order is at least $1 USD equivalent
+        usd_value = postonly_price * quantity
+        if usd_value < 1.0:
+            min_qty = 1.0 / postonly_price
+            quantity = round(max(min_qty, quantity), 6)
+            quantity = round(quantity / 0.01) * 0.01
+
         order_id = exchange.place_order(self.symbol, 'buy', postonly_price, quantity, post_only=True)
         if order_id:
             self.current_orders.append(OrderState(order_id, postonly_price, quantity, 'buy', exchange))
