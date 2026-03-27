@@ -1,0 +1,3 @@
+config_temp.ini
+.venv/
+__pycache__/
