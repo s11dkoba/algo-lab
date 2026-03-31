@@ -331,7 +331,7 @@ class TradingBot:
 
     def check_conditions(self, exchange, asks, price_diff):
         first_ask_qty = asks[0]['quantity']
-        return first_ask_qty < 100 and price_diff >= 0.0001
+        return first_ask_qty < 1500 and price_diff >= 0.0000
 
     def place_initial_order(self, exchange, asks):
         price = asks[1]['price']
