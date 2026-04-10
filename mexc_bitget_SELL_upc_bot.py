@@ -32,7 +32,7 @@ MEXC_API_SECRET = os.getenv('MEXC_API_SECRET', config.get('mexc', 'api_secret', 
 try:
     DRY_RUN = config.getboolean('general', 'dry_run', fallback=False)
 except Exception:
-    DRY_RUN = False
+    DRY_RUN = True
 
 try:
     AUTO_RUN = config.getboolean('general', 'auto_run', fallback=True)
